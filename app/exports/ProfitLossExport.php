@@ -2,13 +2,13 @@
 
 namespace App\Exports;
 
-use Illuminate\Contracts\View\View;
-use Maatwebsite\Excel\Concerns\FromView;
+use Maatwebsite\Excel\Concerns\FromArray;
 use Maatwebsite\Excel\Concerns\ShouldAutoSize;
+use Maatwebsite\Excel\Concerns\WithHeadings;
 use Maatwebsite\Excel\Concerns\WithStyles;
 use PhpOffice\PhpSpreadsheet\Worksheet\Worksheet;
 
-class ProfitLossExport implements FromView, ShouldAutoSize, WithStyles
+class ProfitLossExport implements FromArray, ShouldAutoSize, WithHeadings, WithStyles
 {
     protected $data;
     protected $bulanList;
@@ -19,23 +19,53 @@ class ProfitLossExport implements FromView, ShouldAutoSize, WithStyles
         $this->bulanList = $bulanList;
     }
 
-    public function view(): View
+    public function headings(): array
     {
-        return view('exports.profit_loss', [
-            'data' => $this->data,
-            'bulanList' => $this->bulanList
-        ]);
+        return array_merge(['Kategori'], $this->bulanList);
+    }
+
+    public function array(): array
+    {
+        $rows = [];
+
+        // Income
+        foreach ($this->data['income'] as $kategori => $values) {
+            $row = [$kategori];
+            foreach ($this->bulanList as $bulan) {
+                $row[] = $values[$bulan] ?? 0;
+            }
+            $rows[] = $row;
+        }
+
+        // Total Income
+        $rows[] = array_merge(['Total Income'], array_map(fn($b) => $this->data['total_income'][$b] ?? 0, $this->bulanList));
+
+        // Expense
+        foreach ($this->data['expense'] as $kategori => $values) {
+            $row = [$kategori];
+            foreach ($this->bulanList as $bulan) {
+                $row[] = $values[$bulan] ?? 0;
+            }
+            $rows[] = $row;
+        }
+
+        // Total Expense
+        $rows[] = array_merge(['Total Expense'], array_map(fn($b) => $this->data['total_expense'][$b] ?? 0, $this->bulanList));
+
+        // Net Income
+        $rows[] = array_merge(['Net Income'], array_map(
+            fn($b) => ($this->data['total_income'][$b] ?? 0) - ($this->data['total_expense'][$b] ?? 0),
+            $this->bulanList
+        ));
+
+        return $rows;
     }
 
     public function styles(Worksheet $sheet)
     {
-        $sheet->getStyle('A1:Z2')->applyFromArray([
+        $sheet->getStyle('A1:Z1')->applyFromArray([
             'font' => ['bold' => true],
-            'fill' => [
-                'fillType' => 'solid',
-                'color' => ['rgb' => 'FFFF00']
-            ],
-            'alignment' => ['horizontal' => 'center']
+            'alignment' => ['horizontal' => 'center'],
         ]);
     }
 }
